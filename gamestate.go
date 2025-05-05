@@ -17,22 +17,28 @@ type GameState struct {
 	// add menu with upgrades
 	menuItems    []*MenuItem
 	visibleItems int
+	page         int
+	selectedIdx  int
 }
 
 func NewGameState(screen tcell.Screen) *GameState {
 	return &GameState{
-		base_points: 1000,
+		base_points:  1000,
 		total_points: 0,
-		redraw:      make(chan struct{}, 1), // Buffered channel to prevent blocking
-		screen:      screen,
+		redraw:       make(chan struct{}, 1), // Buffered channel to prevent blocking
+		screen:       screen,
 
 		menuItems:    InitalizeItems(),
 		visibleItems: 2,
+		page:         1,
+		selectedIdx:  1,
 	}
 }
 
 func (gs *GameState) DrawMenu(y int) {
-	for i, item := range gs.menuItems {
+	first_idx := (gs.selectedIdx / 10) * 10
+	last_idx := min(first_idx+10, len(gs.menuItems))
+	for i, item := range gs.menuItems[first_idx:last_idx] {
 		if i >= gs.visibleItems {
 			break
 		}
@@ -44,6 +50,19 @@ func (gs *GameState) DrawMenu(y int) {
 			description = fmt.Sprintf("(Earn %d to unlock)", item.UnlockScore)
 		} else {
 			description = fmt.Sprintf("(%d)", item.Count)
+		}
+
+		// Highlight seleted item
+		if gs.selectedIdx%10 == i {
+			style = style.Background(tcell.ColorBlue)
+			if !item.IsUnlocked {
+				style = style.Background(tcell.ColorLightPink)
+			}
+
+			width, _ := gs.screen.Size()
+			for x := 2; x < width-30; x++ {
+				gs.screen.SetContent(x, y+i, ' ', nil, style)
+			}
 		}
 
 		// name
@@ -113,14 +132,14 @@ func (gs *GameState) Draw() {
 }
 
 func (gs *GameState) Buy(idx int) {
-	idx = idx - 1
+	// idx = idx - 1
 	// Out of range or not unlocked yet
 	if idx >= len(gs.menuItems) || idx >= gs.visibleItems-1 {
 		return
 	}
 
 	item := gs.menuItems[idx]
-	if item.Cost > gs.base_points {
+	if item.Cost > gs.base_points || !item.IsUnlocked {
 		return
 	}
 
@@ -128,11 +147,6 @@ func (gs *GameState) Buy(idx int) {
 	atomic.AddInt64(&item.Count, 1)
 
 	gs.menuItems[idx] = item
-
-	select {
-	case gs.redraw <- struct{}{}: // Request redraw
-	default: // Skip if redraw already pending
-	}
 }
 
 func (gs *GameState) Update() {
@@ -147,7 +161,6 @@ func (gs *GameState) Update() {
 
 	atomic.AddInt64(&gs.base_points, updateAmount)
 	atomic.AddInt64(&gs.total_points, updateAmount)
-
 
 	if gs.visibleItems <= len(gs.menuItems) {
 		if gs.total_points >= gs.menuItems[gs.visibleItems-1].UnlockScore {

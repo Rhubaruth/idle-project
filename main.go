@@ -7,7 +7,6 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-
 func drawString(screen tcell.Screen, x, y int, msg string, style tcell.Style) {
 	for idx, char := range msg {
 		screen.SetContent(x+idx, y, char, nil, style)
@@ -48,7 +47,7 @@ func main() {
 
 	// Game timer
 	go func() {
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(1000 * time.Millisecond)
 		defer ticker.Stop()
 
 		for {
@@ -76,14 +75,24 @@ func main() {
 				if ev.Key() == tcell.KeyEscape || ev.Rune() == 'q' {
 					running = false
 				}
-				if ev.Rune() == '1' || ev.Rune() == '+' {
-					game.Buy(1)
-				} else if ev.Rune() == '2' || ev.Rune() == 'ě' {
-					game.Buy(2)
-				} else if ev.Rune() == '3' || ev.Rune() == 'š' {
-					game.Buy(3)
-				} else if ev.Rune() == '4' || ev.Rune() == ';' {
-					game.Buy(4)
+				if ev.Rune() == 'i' {
+					game.Buy(game.selectedIdx)
+				} else if ev.Rune() == 'j' {
+					game.selectedIdx++
+					if game.selectedIdx >= game.visibleItems || game.selectedIdx >= len(game.menuItems) {
+						game.selectedIdx = 0
+					}
+				} else if ev.Rune() == 'k' {
+					game.selectedIdx--
+					if game.selectedIdx < 0 {
+						game.selectedIdx = min(game.visibleItems, len(game.menuItems))-1
+					}
+				}
+				
+				// Request redraw
+				select {
+				case game.redraw <- struct{}{}: // Request redraw
+				default: // Skip if redraw already pending
 				}
 			}
 		case <-game.redraw: // Redraw channel
