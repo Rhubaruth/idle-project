@@ -23,7 +23,7 @@ type GameState struct {
 
 func NewGameState(screen tcell.Screen) *GameState {
 	return &GameState{
-		base_points:  1000,
+		base_points:  5,
 		total_points: 0,
 		redraw:       make(chan struct{}, 1), // Buffered channel to prevent blocking
 		screen:       screen,
@@ -31,7 +31,7 @@ func NewGameState(screen tcell.Screen) *GameState {
 		menuItems:    InitalizeItems(),
 		visibleItems: 2,
 		page:         1,
-		selectedIdx:  1,
+		selectedIdx:  0,
 	}
 }
 
@@ -68,7 +68,7 @@ func (gs *GameState) DrawMenu(y int) {
 		// name
 		text := fmt.Sprintf(
 			"[%d] %s",
-			i+1,
+			first_idx+i+1,
 			item.Name,
 		)
 		drawString(
@@ -118,16 +118,16 @@ func (gs *GameState) Draw() {
 		gs.screen,
 		10,
 		2,
-		fmt.Sprintf("Calculation Points: %d", atomic.LoadInt64(&gs.base_points)),
+		fmt.Sprintf("Loudness Points: %d", atomic.LoadInt64(&gs.base_points)),
 		tcell.StyleDefault.Foreground(tcell.ColorYellow),
 	)
-	drawString(
-		gs.screen,
-		10,
-		1,
-		fmt.Sprintf("Total acumulated: %d", atomic.LoadInt64(&gs.total_points)),
-		tcell.StyleDefault.Foreground(tcell.ColorLightGray),
-	)
+	// drawString(
+	// 	gs.screen,
+	// 	10,
+	// 	1,
+	// 	fmt.Sprintf("Total acumulated: %d", atomic.LoadInt64(&gs.total_points)),
+	// 	tcell.StyleDefault.Foreground(tcell.ColorLightGray),
+	// )
 	gs.screen.Show()
 }
 
@@ -146,6 +146,9 @@ func (gs *GameState) Buy(idx int) {
 	atomic.AddInt64(&gs.base_points, -item.Cost)
 	atomic.AddInt64(&item.Count, 1)
 
+	increment := float64(item.Cost) * 0.1
+	atomic.AddInt64(&item.Cost, max(1, int64(increment)))
+
 	gs.menuItems[idx] = item
 }
 
@@ -163,7 +166,7 @@ func (gs *GameState) Update() {
 	atomic.AddInt64(&gs.total_points, updateAmount)
 
 	if gs.visibleItems <= len(gs.menuItems) {
-		if gs.total_points >= gs.menuItems[gs.visibleItems-1].UnlockScore {
+		if gs.base_points >= gs.menuItems[gs.visibleItems-1].UnlockScore {
 			gs.menuItems[gs.visibleItems-1].IsUnlocked = true
 			gs.visibleItems += 1
 		}
